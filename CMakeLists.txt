@@ -28,10 +28,18 @@ target_include_directories(${EXTRACTOR_TARGET} PRIVATE
 # 4. Flag di Link per Embind e Modularizzazione
 target_link_options(${EXTRACTOR_TARGET} PRIVATE
         "--bind"
+        "--no-entry"
         "-sMODULARIZE=1"
         "-sEXPORT_ES6=1"
         "-sENVIRONMENT=node"
         "-sALLOW_MEMORY_GROWTH=1"
+        "-sFILESYSTEM=0"
+        "-sMALLOC=emmalloc"
+        "-sASSERTIONS=0"
+        "-sSTACK_SIZE=64KB"
+        "-sINCOMING_MODULE_JS_API=[]"
+        "-sSTRICT=1"                   # Modalità rigorosa (rimuove legacy bloat)
+        "-sEXPORTED_RUNTIME_METHODS=[]"
 )
 
 # 5. Automazione della generazione TypeScript
