@@ -1,0 +1,66 @@
+name: CI Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout del codice con Sottomoduli (FONDAMENTALE)
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # 2. Setup di Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3. Setup di Emscripten (Installa e casha l'SDK)
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.17 # Usa una versione recente o quella che usi in locale
+          actions-cache-folder: 'emsdk-cache'
+
+      # 4. Installazione Ninja e CMake (già presenti su ubuntu-latest, ma per sicurezza)
+      - name: Install Build Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake
+
+      # 5. Installazione dipendenze NPM
+      - name: Install NPM dependencies
+        run: npm ci
+
+      # 6. Generazione Costanti (C++ -> WASM -> TS)
+      - name: Generate Constants
+        run: npm run generate:cmake
+
+      - name: Build constants
+        run: npm run generate
+
+      # 7. Compilazione Finale (TS -> JS/d.ts)
+      - name: Build TypeScript
+        run: npm run build:ts
+
+      # 8. (Opzionale ma CONSIGLIATO) Check per file non committati
+      # Se il file .ts generato è diverso da quello committato, la build fallisce.
+      # Questo ti obbliga a tenere sincronizzati C++ e TS.
+      - name: Check for unsynced changes
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "❌ Error: The generated files are out of sync with C++ sources."
+            echo "Please run 'npm run generate' locally and commit the changes."
+            git status
+            git diff
+            exit 1
+          fi
