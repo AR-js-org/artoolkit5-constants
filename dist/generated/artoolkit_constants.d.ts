@@ -1,6 +1,6 @@
 /**
  * GENERATED FILE - DO NOT EDIT
- * Generated on: 2026-02-02T16:52:48.685Z
+ * Generated on: 2026-02-02T18:17:25.422Z
  */
 export declare const AR_TEMPLATE_MATCHING_COLOR: number;
 export declare const AR_TEMPLATE_MATCHING_MONO: number;
