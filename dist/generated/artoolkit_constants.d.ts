@@ -1,7 +1,14 @@
 /**
  * GENERATED FILE - DO NOT EDIT
- * Generated on: 2026-02-02T18:17:25.422Z
+ * Generated on: 2026-02-02T18:30:37.643Z
  */
+export declare const AR_PIXEL_FORMAT_RGB: number;
+export declare const AR_PIXEL_FORMAT_BGR: number;
+export declare const AR_PIXEL_FORMAT_RGBA: number;
+export declare const AR_PIXEL_FORMAT_BGRA: number;
+export declare const AR_PIXEL_FORMAT_MONO: number;
+export declare const AR_PIXEL_FORMAT_420f: number;
+export declare const AR_PIXEL_FORMAT_420v: number;
 export declare const AR_TEMPLATE_MATCHING_COLOR: number;
 export declare const AR_TEMPLATE_MATCHING_MONO: number;
 export declare const AR_MATRIX_CODE_DETECTION: number;
