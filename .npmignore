@@ -1,0 +1,14 @@
+# Ignora i sorgenti C++ e i tool di build
+src/constants_extractor.cpp
+tools/
+build/
+CMakeLists.txt
+*.cmake
+
+# Ignora i sottomoduli
+third_party/
+
+# Ignora file di configurazione non necessari all'utente finale
+tsconfig.json
+.gitignore
+.gitmodules

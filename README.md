@@ -1,61 +1,90 @@
-# ARToolKit5 Constants Generator
+# ARToolKit5 Constants
 
-This repository provides an automated way to generate **TypeScript** definitions for **ARToolKit5** constants.
+[![npm version](https://img.shields.io/npm/v/@webarkit/artoolkit5-constants.svg)](https://www.npmjs.com/package/@webarkit/artoolkit5-constants)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-It uses a metadata-extraction approach: instead of parsing C++ headers with error-prone regex, we compile a minimal **WebAssembly** extractor using **Embind**. This extractor is then executed in a Node.js environment to generate a static, fully typed TypeScript file that acts as the "Single Source of Truth" for the WebARKit ecosystem.
+**Zero-dependency, auto-generated TypeScript definitions for ARToolKit5 constants.**
 
+This package provides a strict "Single Source of Truth" for the ARToolKit ecosystem. Instead of manually maintaining magic numbers in JavaScript, we extract values directly from the C++ source code using a WebAssembly extractor.
 
+## 📦 Installation
 
-## Why this project?
+```bash
+npm install @webarkit/artoolkit5-constants
+```
 
-* **Guaranteed Sync:** Constants are exactly what the C++ core uses.
-* **Zero Runtime Overhead:** Constants are exported as a static TS file. No need to load the heavy WASM module just to check a configuration flag.
-* **Modularity:** Enables lightweight packages to depend on ARToolKit definitions without pulling in the entire tracking library.
+## 🚀 Usage
 
-## Project Structure
+This library exports constants individually to support **tree-shaking**. You have two ways to use them depending on your preference.
 
-* `src/constants_extractor.cpp`: The C++ binder that exposes macros via `emscripten::constant`.
-* `tools/gen_constants.js`: Node.js script that instantiates the WASM and exports values to TS format.
-* `third_party/WebARKitLib`: Submodule containing the ARToolKit5 core source code.
-
-## Requirements
-
-* [Emscripten SDK](https://emscripten.org/)
-* [CMake](https://cmake.org/)
-* [Ninja](https://ninja-build.org/) (or another compatible build generator)
-* [Node.js](https://nodejs.org/) (v18+)
-
-## Build and Generation
-
-To generate the `artoolkit_constants.ts` file, follow these steps:
-
-1.  **Initialize submodules:**
-    ```bash
-    git submodule update --init --recursive
-    ```
-
-2.  **Configure the build with Emscripten:**
-    Use the Visual Studio Developer Command Prompt (or any environment with Ninja/CMake in PATH):
-    ```bash
-    mkdir build && cd build
-    emcmake cmake -G Ninja ..
-    ```
-
-3.  **Run the generation:**
-    ```bash
-    ninja generate_ts
-    ```
-
-The generated file will be located at `src/generated/artoolkit_constants.ts`.
-
-## Usage
-
-You can import the constants directly into your TypeScript project:
+### 1. Named Imports (Recommended)
+Import only what you need. This allows bundlers (Webpack, Rollup, Vite) to remove unused code, keeping your application lightweight.
 
 ```typescript
-import { AR_MATRIX_CODE_DETECTION } from './src/generated/artoolkit_constants';
+import {
+    AR_PIXEL_FORMAT_RGBA,
+    AR_MATRIX_CODE_DETECTION
+} from '@webarkit/artoolkit5-constants';
 
-// Example: checking detection mode
-if (currentMode === AR_MATRIX_CODE_DETECTION) {
-    console.log("Matrix code detection is active.");
+// Example: Configuring ARController
+const config = {
+    pixelFormat: AR_PIXEL_FORMAT_RGBA,
+    detectionMode: AR_MATRIX_CODE_DETECTION
+};
+
+if (config.pixelFormat === AR_PIXEL_FORMAT_RGBA) {
+    console.log("Using RGBA format");
 }
+```
+
+### 2. Namespace Import (Grouped Style)
+If you prefer accessing constants via a global object (similar to how Enums work or legacy ARToolKit structure), use the `import * as` syntax:
+
+```typescript
+import * as AR from '@webarkit/artoolkit5-constants';
+
+// Now you can access everything under 'AR'
+console.log(AR.AR_LOG_LEVEL_ERROR); // Output: 3
+console.log(AR.AR_TEMPLATE_MATCHING_MONO); // Output: 1
+
+function setLogLevel(level: number) {
+    if (level === AR.AR_LOG_LEVEL_DEBUG) {
+        // enable debug tools
+    }
+}
+```
+
+## 🛠 How it Works (For Contributors)
+
+This project uses a unique build pipeline to ensure accuracy:
+1.  **C++ Source**: It links against the `WebARKitLib` submodule.
+2.  **Embind Extraction**: A minimal C++ program exposes macros and enums via WebAssembly.
+3.  **Generation**: A Node.js script loads the WASM, reads the values, and generates a static `.ts` file.
+
+### Build Requirements
+* [Emscripten SDK](https://emscripten.org/)
+* [CMake](https://cmake.org/)
+* [Ninja](https://ninja-build.org/)
+* Node.js (v18+)
+
+### Development Commands
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Initialize submodule (ARToolKit5 source)
+git submodule update --init --recursive
+
+# 3. Generate the TypeScript file (Requires Emscripten environment active)
+npm run generate
+
+# 4. Build the final package (Transpile to JS + .d.ts)
+npm run build
+```
+
+The generated source file is located at `src/generated/artoolkit_constants.ts`.
+
+## License
+
+This project is licensed under the GPLv3 License - see the [LICENSE](LICENSE) file for details.
