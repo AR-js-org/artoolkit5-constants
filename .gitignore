@@ -11,3 +11,4 @@ src/generated/*.ts
 !dist/**/*.d.ts
 !dist/**/*.map
 .idea/
+emsdk-cache/
