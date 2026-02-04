@@ -16,14 +16,38 @@
   "files": [
     "dist"
   ],
+  "keywords": [
+    "artoolkit",
+    "artoolkit5",
+    "augmented-reality",
+    "ar",
+    "webassembly",
+    "wasm",
+    "emscripten",
+    "constants",
+    "webarkit"
+  ],
+  "author": {
+    "name": "Walter Perdan",
+    "url": "https://github.com/kalwalt"
+  },
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kalwalt/artoolkit5-constants.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kalwalt/artoolkit5-constants/issues"
+  },
+  "homepage": "https://github.com/kalwalt/artoolkit5-constants#readme",
   "scripts": {
-    "configure": "cmake -B build -S .",
+    "configure": "node ./tools/configure.js",
     "build:ts": "tsc",
     "build:extractor": "cmake --build build --target constants_extractor",
     "clean": "rimraf ./build ./dist",
-    "generate:cmake": "cmake --build build --target generate_ts",
     "generate": "node ./tools/gen_constants.js ./build/constants_extractor.js ./src/generated/artoolkit_constants.ts",
-    "build": "npm run configure && npm run build:extractor && npm run generate && npm run build:ts"
+    "build": "npm run configure && npm run build:extractor && npm run generate && npm run build:ts",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "rimraf": "^6.1.2",
