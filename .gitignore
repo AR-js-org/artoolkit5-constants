@@ -5,4 +5,10 @@ src/generated/*.ts
 *.wasm
 *.js
 !tools/gen_constants.js
-.idea
+!tools/configure.js
+!dist/
+!dist/**/*.js
+!dist/**/*.d.ts
+!dist/**/*.map
+.idea/
+emsdk-cache/

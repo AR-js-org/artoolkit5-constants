@@ -3,22 +3,56 @@
   "version": "1.0.0",
   "description": "Generator for ARToolKit5 constants via Embind extraction",
   "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "type": "module",
   "files": [
-    "dist",
-    "src/generated/artoolkit_constants.ts"
+    "dist"
   ],
+  "keywords": [
+    "artoolkit",
+    "artoolkit5",
+    "augmented-reality",
+    "ar",
+    "webassembly",
+    "wasm",
+    "emscripten",
+    "constants",
+    "webarkit"
+  ],
+  "author": {
+    "name": "Walter Perdan",
+    "url": "https://github.com/kalwalt"
+  },
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kalwalt/artoolkit5-constants.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kalwalt/artoolkit5-constants/issues"
+  },
+  "homepage": "https://github.com/kalwalt/artoolkit5-constants#readme",
   "scripts": {
+    "configure": "node ./tools/configure.js",
     "build:ts": "tsc",
     "build:extractor": "cmake --build build --target constants_extractor",
-    "clean": "rm -rf dist build",
-    "generate:cmake": "cmake --build build --target generate_ts",
-    "generate": "node ./tools/gen_constants.js ./build/constants_extractor.js ./src/generated/artoolkit_constants.ts"
+    "clean": "rimraf ./build ./dist",
+    "generate": "node ./tools/gen_constants.js ./build/constants_extractor.js ./src/generated/artoolkit_constants.ts",
+    "build": "npm run configure && npm run build:extractor && npm run generate && npm run build:ts",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
+    "rimraf": "^6.1.2",
     "typescript": "^5.9.3",
     "@types/emscripten": "^1.41.5",
-    "@types/node": "^20.10.0"
+    "@types/node": "^25.2.0"
   }
 }

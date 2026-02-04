@@ -1,6 +1,5 @@
 /**
  * GENERATED FILE - DO NOT EDIT
- * Generated on: 2026-02-02T18:30:37.643Z
  */
 export declare const AR_PIXEL_FORMAT_RGB: number;
 export declare const AR_PIXEL_FORMAT_BGR: number;

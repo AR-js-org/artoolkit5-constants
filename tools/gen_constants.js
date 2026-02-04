@@ -12,7 +12,7 @@ async function generate() {
         const { default: ARToolKitModule } = await import(moduleUrl);
         const instance = await ARToolKitModule();
 
-        let tsContent = `/**\n * GENERATED FILE - DO NOT EDIT\n * Generated on: ${new Date().toISOString()}\n */\n\n`;
+        let tsContent = `/**\n * GENERATED FILE - DO NOT EDIT\n */\n\n`;
 
         const allKeys = Object.keys(instance);
 
