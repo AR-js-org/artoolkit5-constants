@@ -1,18 +1,18 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "ESNext",
-    "moduleResolution": "node",
-    "declaration": true,           /* Genera i file .d.ts */
-    "declarationMap": true,        /* Utile per il debugging */
-    "sourceMap": true,             /* Utile per il debugging */
-    "outDir": "./dist",            /* Dove verranno salvati i file compilati */
-    "rootDir": "./src",            /* Punto di partenza dei sorgenti */
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "lib": ["ESNext", "DOM"]       /* "DOM" serve se le costanti vengono usate in browser */
+    "lib": ["ESNext", "DOM"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "tools", "build"]

@@ -3,18 +3,27 @@
   "version": "1.0.0",
   "description": "Generator for ARToolKit5 constants via Embind extraction",
   "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "type": "module",
   "files": [
-    "dist",
-    "src/generated/artoolkit_constants.ts"
+    "dist"
   ],
   "scripts": {
+    "configure": "cmake -B build -S .",
     "build:ts": "tsc",
     "build:extractor": "cmake --build build --target constants_extractor",
     "clean": "rm -rf dist build",
     "generate:cmake": "cmake --build build --target generate_ts",
-    "generate": "node ./tools/gen_constants.js ./build/constants_extractor.js ./src/generated/artoolkit_constants.ts"
+    "generate": "node ./tools/gen_constants.js ./build/constants_extractor.js ./src/generated/artoolkit_constants.ts",
+    "build": "npm run configure && npm run build:extractor && npm run generate && npm run build:ts"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
