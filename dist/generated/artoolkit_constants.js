@@ -1,6 +1,6 @@
 /**
  * GENERATED FILE - DO NOT EDIT
- * Generated on: 2026-02-04T19:17:53.895Z
+ * Generated on: 2026-02-04T19:49:15.843Z
  */
 export const AR_PIXEL_FORMAT_RGB = 0;
 export const AR_PIXEL_FORMAT_BGR = 1;
