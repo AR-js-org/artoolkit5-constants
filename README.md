@@ -1,6 +1,9 @@
 # ARToolKit5 Constants
 
 [![npm version](https://img.shields.io/npm/v/@webarkit/artoolkit5-constants.svg)](https://www.npmjs.com/package/@webarkit/artoolkit5-constants)
+[![CI](https://github.com/webarkit/artoolkit5-constants/actions/workflows/ci.yml/badge.svg)](https://github.com/webarkit/artoolkit5-constants/actions)
+[![GitHub stars](https://img.shields.io/github/stars/webarkit/artoolkit5-constants)](https://github.com/webarkit/artoolkit5-constants/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/webarkit/artoolkit5-constants)](https://github.com/webarkit/artoolkit5-constants/network)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 **Zero-dependency, auto-generated TypeScript definitions for ARToolKit5 constants.**

@@ -11,43 +11,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout del codice con Sottomoduli (FONDAMENTALE)
+      # 1. Checkout the code with submodules (ESSENTIAL)
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
 
-      # 2. Setup di Node.js
+      # 2. Set up Node.js
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '25'
           cache: 'npm'
 
-      # 3. Setup di Emscripten (Installa e casha l'SDK)
+      # 3. Set up Emscripten (installs and caches the SDK)
       - name: Setup Emscripten
-        uses: mymindstorm/setup-emsdk@v14
+        uses: mymindstorm/setup-emsdk@v16
         with:
-          version: 4.0.17 # Usa una versione recente o quella che usi in locale
+          version: 4.0.17 # Use a recent version or the one you use locally
           actions-cache-folder: 'emsdk-cache'
 
-      # 4. Installazione Ninja e CMake (già presenti su ubuntu-latest, ma per sicurezza)
+      # 4. Install Ninja and CMake (already available on ubuntu-latest, but added for safety)
       - name: Install Build Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build cmake
 
-      # 5. Installazione dipendenze NPM
+      # 5. Install NPM dependencies
       - name: Install NPM dependencies
         run: npm ci
 
-      # 6. Build completa (Configure -> Extractor -> Generate -> TS)
+      # 6. Full build (Configure -> Extractor -> Generate -> TS)
       - name: Build Project
         run: npm run build
 
-      # 7. (Opzionale ma CONSIGLIATO) Check per file non committati
-      # Se il file .ts generato è diverso da quello committato, la build fallisce.
-      # Questo ti obbliga a tenere sincronizzati C++ e TS.
+      # 7. (Optional but RECOMMENDED) Check for uncommitted files
+      # If the generated .ts file differs from the committed one, the build fails.
+      # This keeps the C++ and TS sources in sync.
       - name: Check for unsynced changes
         run: |
           if [[ -n $(git status --porcelain) ]]; then
