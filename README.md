@@ -1,9 +1,9 @@
 # ARToolKit5 Constants
 
-[![npm version](https://img.shields.io/npm/v/@webarkit/artoolkit5-constants.svg)](https://www.npmjs.com/package/@webarkit/artoolkit5-constants)
-[![CI](https://github.com/webarkit/artoolkit5-constants/actions/workflows/ci.yml/badge.svg)](https://github.com/webarkit/artoolkit5-constants/actions)
-[![GitHub stars](https://img.shields.io/github/stars/webarkit/artoolkit5-constants)](https://github.com/webarkit/artoolkit5-constants/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/webarkit/artoolkit5-constants)](https://github.com/webarkit/artoolkit5-constants/network)
+[![npm version](https://img.shields.io/npm/v/@AR-js-org/artoolkit5-constants.svg)](https://www.npmjs.com/package/@AR-js-org/artoolkit5-constants)
+[![CI](https://github.com/AR-js-org/artoolkit5-constants/actions/workflows/ci.yml/badge.svg)](https://github.com/AR-js-org/artoolkit5-constants/actions)
+[![GitHub stars](https://img.shields.io/github/stars/AR-js-org/artoolkit5-constants)](https://github.com/AR-js-org/artoolkit5-constants/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/AR-js-org/artoolkit5-constants)](https://github.com/AR-js-org/artoolkit5-constants/network)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 **Zero-dependency, auto-generated TypeScript definitions for ARToolKit5 constants.**
@@ -13,7 +13,7 @@ This package provides a strict "Single Source of Truth" for the ARToolKit ecosys
 ## 📦 Installation
 
 ```bash
-npm install @webarkit/artoolkit5-constants
+npm install @ar-js-org/artoolkit5-constants
 ```
 
 ## 🚀 Usage
@@ -27,7 +27,7 @@ Import only what you need. This allows bundlers (Webpack, Rollup, Vite) to remov
 import {
     AR_PIXEL_FORMAT_RGBA,
     AR_MATRIX_CODE_DETECTION
-} from '@webarkit/artoolkit5-constants';
+} from '@ar-js-org/artoolkit5-constants';
 
 // Example: Configuring ARController
 const config = {
@@ -44,7 +44,7 @@ if (config.pixelFormat === AR_PIXEL_FORMAT_RGBA) {
 If you prefer accessing constants via a global object (similar to how Enums work or legacy ARToolKit structure), use the `import * as` syntax:
 
 ```typescript
-import * as AR from '@webarkit/artoolkit5-constants';
+import * as AR from '@ar-js-org//artoolkit5-constants';
 
 // Now you can access everything under 'AR'
 console.log(AR.AR_LOG_LEVEL_ERROR); // Output: 3

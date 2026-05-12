@@ -1,5 +1,5 @@
 {
-  "name": "@webarkit/artoolkit5-constants",
+  "name": "@ar-js-org/artoolkit5-constants",
   "version": "0.1.0",
   "description": "Generator for ARToolKit5 constants via Embind extraction",
   "main": "./dist/index.js",
@@ -30,17 +30,17 @@
   ],
   "author": {
     "name": "Walter Perdan",
-    "url": "https://github.com/webarkit"
+    "url": "https://github.com/kalwalt"
   },
   "license": "GPL-3.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/webarkit/artoolkit5-constants.git"
+    "url": "git+https://github.com/AR-js-org/artoolkit5-constants.git"
   },
   "bugs": {
-    "url": "https://github.com/webarkit/artoolkit5-constants/issues"
+    "url": "https://github.com/AR-js-org/artoolkit5-constants/issues"
   },
-  "homepage": "https://github.com/webarkit/artoolkit5-constants#readme",
+  "homepage": "https://github.com/AR-js-org/artoolkit5-constants#readme",
   "scripts": {
     "configure": "node ./tools/configure.js",
     "build:ts": "tsc",
