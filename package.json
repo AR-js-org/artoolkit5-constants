@@ -1,6 +1,6 @@
 {
   "name": "@ar-js-org/artoolkit5-constants",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Generator for ARToolKit5 constants via Embind extraction",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
