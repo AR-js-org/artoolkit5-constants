@@ -64,29 +64,54 @@ This project uses a unique build pipeline to ensure accuracy:
 2.  **Embind Extraction**: A minimal C++ program exposes macros and enums via WebAssembly.
 3.  **Generation**: A Node.js script loads the WASM, reads the values, and generates a static `.ts` file.
 
-### Build Requirements
-* [Emscripten SDK](https://emscripten.org/)
-* [CMake](https://cmake.org/)
-* [Ninja](https://ninja-build.org/)
-* Node.js (v18+)
+### Building (recommended: Docker)
 
-### Development Commands
+The generated constants are **committed**, and CI regenerates them and fails if
+the result differs from what is in the repository. A build therefore has to use
+the same toolchain CI does, or it produces a pull request that cannot pass.
+
+`npm run build:docker` guarantees that. It builds inside the pinned Emscripten
+image — the same one CI runs in — so nothing depends on what happens to be
+installed locally:
 
 ```bash
-# 1. Install dependencies
-npm install
-
-# 2. Initialize submodule (ARToolKit5 source)
 git submodule update --init --recursive
-
-# 3. Generate the TypeScript file (Requires Emscripten environment active)
-npm run generate
-
-# 4. Build the final package (Transpile to JS + .d.ts)
-npm run build
+npm install
+npm run build:docker
 ```
 
-The generated source file is located at `src/generated/artoolkit_constants.ts`.
+Docker is the only requirement; the image supplies Emscripten, CMake and Node.
+
+#### The version pin
+
+The Emscripten version lives in [`.emscripten-version`](.emscripten-version) and
+is used in two places:
+
+| Where | How |
+|---|---|
+| `npm run build:docker` | reads the file and uses it as the image tag |
+| `.github/workflows/ci.yml` | `container:` tag, asserted against the file on every run |
+
+CI cannot read the file to choose its container — `container:` is resolved
+before the repository is checked out — so the tag is written out there as well.
+The first CI step compares `emcc --version` against the file and fails if they
+have drifted, which means **the two must be changed together**.
+
+### Building without Docker
+
+Possible, but you are responsible for matching the pinned version. You will need
+[Emscripten](https://emscripten.org/) (exactly the version in
+`.emscripten-version`), [CMake](https://cmake.org/), optionally
+[Ninja](https://ninja-build.org/) — the build falls back to Makefiles without it
+— and Node.js 18+.
+
+```bash
+git submodule update --init --recursive
+npm install
+npm run build          # configure -> extractor -> generate -> TypeScript
+```
+
+The generated source file is written to `src/generated/artoolkit_constants.ts`.
 
 ## License
 

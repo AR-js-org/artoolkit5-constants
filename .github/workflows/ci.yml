@@ -10,50 +10,59 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # The same image `npm run build:docker` uses locally — not merely the same
+    # Emscripten version installed a different way. The build regenerates the
+    # constants and the last step fails if the result differs from what is
+    # committed, so "builds here" and "builds in CI" have to be the same thing.
+    #
+    # Keep this tag in step with .emscripten-version; the first step fails loudly
+    # if they drift. It cannot read the file directly: `container` is resolved
+    # before the repository is checked out.
+    container: emscripten/emsdk:4.0.17
+
     steps:
-      # 1. Checkout the code with submodules (ESSENTIAL)
       - name: Checkout code
         uses: actions/checkout@v6
         with:
           submodules: recursive
 
-      # 2. Set up Node.js
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '25'
-          cache: 'npm'
+      # The checkout is owned by a different user than this container runs as,
+      # which trips git's dubious-ownership guard — and the sync check below is
+      # a git command, so it would fail for the wrong reason.
+      - name: Trust the workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      # 3. Set up Emscripten (installs and caches the SDK)
-      - name: Setup Emscripten
-        uses: mymindstorm/setup-emsdk@v16
-        with:
-          version: 4.0.17 # Use a recent version or the one you use locally
-          actions-cache-folder: 'emsdk-cache'
-
-      # 4. Install Ninja and CMake (already available on ubuntu-latest, but added for safety)
-      - name: Install Build Tools
+      - name: Verify the toolchain matches the pin
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build cmake
+          PINNED="$(cat .emscripten-version)"
+          ACTUAL="$(emcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 
-      # 5. Install NPM dependencies
+          if [ "$PINNED" != "$ACTUAL" ]; then
+            echo "::error::.emscripten-version says $PINNED but this container has emcc $ACTUAL."
+            echo "Update the 'container:' tag in this workflow and .emscripten-version together."
+            exit 1
+          fi
+
+          echo "Emscripten $ACTUAL matches .emscripten-version."
+          node --version
+
       - name: Install NPM dependencies
         run: npm ci
 
-      # 6. Full build (Configure -> Extractor -> Generate -> TS)
+      # Configure -> extractor -> generate -> TypeScript
       - name: Build Project
         run: npm run build
 
-      # 7. (Optional but RECOMMENDED) Check for uncommitted files
-      # If the generated .ts file differs from the committed one, the build fails.
-      # This keeps the C++ and TS sources in sync.
+      # The generated constants are committed. If a build produces something
+      # different, either the C++ changed without the output being regenerated,
+      # or the toolchain is not what it claims to be. Both should stop the build.
       - name: Check for unsynced changes
         run: |
-          if [[ -n $(git status --porcelain) ]]; then
-            echo "❌ Error: The generated files are out of sync with C++ sources."
-            echo "Please run 'npm run generate' locally and commit the changes."
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::The generated files are out of sync with the C++ sources."
+            echo "Run 'npm run build:docker' locally and commit the result."
             git status
             git diff
             exit 1
           fi
+          echo "Generated output matches the committed files."
