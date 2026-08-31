@@ -1,1 +1,36 @@
+/*
+ *  index.ts
+ *  artoolkit5-constants
+ *
+ *  This file is part of artoolkit5-constants - AR-js-org.
+ *
+ *  Permission is hereby granted, free of charge, to any person obtaining a copy
+ *  of this software and associated documentation files (the "Software"), to deal
+ *  in the Software without restriction, including without limitation the rights
+ *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *  copies of the Software, and to permit persons to whom the Software is
+ *  furnished to do so, subject to the following conditions:
+ *
+ *  The above copyright notice and this permission notice shall be included in
+ *  all copies or substantial portions of the Software.
+ *
+ *  artoolkit5-constants is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. See the MIT License
+ *  for more details.
+ *
+ *  You should have received a copy of the MIT License along with
+ *  artoolkit5-constants. If not, see <https://opensource.org/licenses/MIT>.
+ *
+ *  The constants re-exported here are extracted at build time from ARToolkit5
+ *  (WebARKitLib) headers, which are licensed under the GNU Lesser General
+ *  Public License v3.0. Only the extracted values are published; no
+ *  WebARKitLib code is included.
+ *
+ *  Copyright (c) 2026 AR-js-org
+ *
+ *  Author(s): Walter Perdan @kalwalt https://github.com/kalwalt
+ *
+ */
+
 export * from './generated/artoolkit_constants.js';
