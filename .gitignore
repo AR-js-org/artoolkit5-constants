@@ -11,3 +11,9 @@ src/generated/*.ts
 !dist/**/*.map
 .idea/
 emsdk-cache/
+
+# Agent scratch material stays local; the skills are part of the repository.
+# The parent has to be excluded with a glob rather than `.agents/`, because git
+# will not re-include a path whose parent directory is itself excluded.
+.agents/*
+!.agents/skills/

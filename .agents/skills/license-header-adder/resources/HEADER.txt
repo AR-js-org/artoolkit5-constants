@@ -1,5 +1,5 @@
 /*
- *  index.ts
+ *  {{FILENAME}}
  *  artoolkit5-constants
  *
  *  This file is part of artoolkit5-constants - AR-js-org.
@@ -22,15 +22,8 @@
  *  You should have received a copy of the MIT License along with
  *  artoolkit5-constants. If not, see <https://opensource.org/licenses/MIT>.
  *
- *  The constants re-exported here are extracted at build time from ARToolkit5
- *  (WebARKitLib) headers, which are licensed under the GNU Lesser General
- *  Public License v3.0. Only the extracted values are published; no
- *  WebARKitLib code is included.
- *
- *  Copyright (c) 2026 AR-js-org
+{{LINEAGE}} *  Copyright (c) 2026 AR-js-org
  *
  *  Author(s): Walter Perdan @kalwalt https://github.com/kalwalt
  *
  */
-export * from './generated/artoolkit_constants.js';
-//# sourceMappingURL=index.js.map
