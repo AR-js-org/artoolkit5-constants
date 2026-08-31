@@ -48,6 +48,7 @@
     "clean": "rimraf ./build ./dist",
     "generate": "node ./tools/gen_constants.js ./build/constants_extractor.js ./src/generated/artoolkit_constants.ts",
     "build": "npm run configure && npm run build:extractor && npm run generate && npm run build:ts",
+    "build:docker": "node ./tools/docker-build.js",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
