@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-31
+
 Constant coverage grows from 55 to 62. Every *mode* group in `arConfig.h` is now
 generated; what remains are tuning defaults and limits, not enumerations.
 
@@ -95,6 +97,7 @@ change, since the disable flag is a build-time decision that may change.
 
 Initial release.
 
-[Unreleased]: https://github.com/AR-js-org/artoolkit5-constants/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/AR-js-org/artoolkit5-constants/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/AR-js-org/artoolkit5-constants/releases/tag/v0.1.0
+[Unreleased]: https://github.com/AR-js-org/artoolkit5-constants/compare/0.3.0...HEAD
+[0.3.0]: https://github.com/AR-js-org/artoolkit5-constants/compare/0.2.0...0.3.0
+[0.2.0]: https://github.com/AR-js-org/artoolkit5-constants/compare/0.1.0...0.2.0
+[0.1.0]: https://github.com/AR-js-org/artoolkit5-constants/tree/0.1.0
