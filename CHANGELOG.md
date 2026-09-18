@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Licence metadata now declares MIT.** `package.json`, `package-lock.json`,
+  `LICENSE` and the README all said GPL-3.0, contradicting every source file
+  header and this repository's own `AGENTS.md`, which both state the package is
+  MIT. The licence *terms* are unchanged: the declaration is corrected to match
+  what the headers have always said, so this is a correction rather than a
+  relicence. `LICENSE` now also records the provenance explicitly — the
+  constants are extracted at build time from LGPLv3 WebARKitLib headers, only
+  the extracted values are published, and `src/constants_extractor.cpp` is the
+  sole file that includes those headers and never ships.
+
 ## [0.3.0] - 2026-08-31
 
 Constant coverage grows from 55 to 62. Every *mode* group in `arConfig.h` is now
