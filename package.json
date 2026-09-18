@@ -32,7 +32,7 @@
     "name": "Walter Perdan",
     "url": "https://github.com/kalwalt"
   },
-  "license": "GPL-3.0",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AR-js-org/artoolkit5-constants.git"

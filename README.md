@@ -4,7 +4,7 @@
 [![CI](https://github.com/AR-js-org/artoolkit5-constants/actions/workflows/ci.yml/badge.svg)](https://github.com/AR-js-org/artoolkit5-constants/actions)
 [![GitHub stars](https://img.shields.io/github/stars/AR-js-org/artoolkit5-constants)](https://github.com/AR-js-org/artoolkit5-constants/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/AR-js-org/artoolkit5-constants)](https://github.com/AR-js-org/artoolkit5-constants/network)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Zero-dependency, auto-generated TypeScript definitions for ARToolKit5 constants.**
 
@@ -115,4 +115,9 @@ The generated source file is written to `src/generated/artoolkit_constants.ts`.
 
 ## License
 
-This project is licensed under the GPLv3 License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+The constants are extracted at build time from ARToolKit5 (WebARKitLib) headers,
+which are LGPLv3. Only the extracted values are published; no WebARKitLib code is
+distributed. `src/constants_extractor.cpp` is the one file that includes those
+headers, and it is a build-time tool that never ships.
