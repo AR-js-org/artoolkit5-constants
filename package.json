@@ -50,7 +50,7 @@
     "generate:version": "node ./tools/gen_version.js",
     "generate": "npm run generate:constants && npm run generate:version",
     "build": "npm run configure && npm run build:extractor && npm run generate && npm run build:ts",
-    "build:version": "npm run generate:version && npm run build:ts",
+    "build:version": "npm run generate:version && tsc -p tsconfig.version.json",
     "build:docker": "node ./tools/docker-build.js"
   },
   "publishConfig": {
