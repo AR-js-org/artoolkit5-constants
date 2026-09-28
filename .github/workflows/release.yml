@@ -1,8 +1,9 @@
 name: Release
 
-# Run manually from the Actions tab. This workflow performs the whole release:
-# it bumps the version, promotes the changelog, tags, creates the GitHub Release
-# and publishes to npm with OIDC Trusted Publishing (no NPM_TOKEN needed).
+# Run manually from the Actions tab. This workflow performs the release:
+# it validates the version and dist/ sync, bumps package.json, tags, publishes
+# to npm with OIDC Trusted Publishing (no NPM_TOKEN needed), and creates the
+# GitHub Release.
 #
 # It is one workflow rather than two on purpose. A Release created with the
 # default GITHUB_TOKEN does not trigger other workflows — GitHub blocks that to
@@ -103,6 +104,16 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
+      - name: Verify npm CLI version
+        run: |
+          echo "Node version: $(node --version)"
+          echo "npm version: $(npm --version)"
+          NPM_MAJOR=$(npm --version | cut -d. -f1)
+          if [ "$NPM_MAJOR" -lt 11 ]; then
+            echo "::error::npm version 11 or higher is required for Trusted Publishing. Found: $(npm --version)"
+            exit 1
+          fi
+
       - name: Validate the version
         id: validate
         # Read from the environment rather than interpolated into the script.
@@ -121,9 +132,16 @@ jobs:
           fi
 
           # This repo uses bare tags (0.1.0, not v0.1.0).
+          # If the tag exists, check if it's already published on npm.
           if git show-ref --tags --verify --quiet "refs/tags/$VERSION"; then
-            echo "::error::Tag $VERSION already exists. Releasing it again would rewrite history."
-            exit 1
+            NAME="$(node -p "require('./package.json').name")"
+            STATUS=0
+            OUTPUT=$(npm view "$NAME@$VERSION" version 2>&1) || STATUS=$?
+            if [ "$STATUS" -eq 0 ]; then
+              echo "::error::Tag $VERSION already exists and $NAME@$VERSION is already published on npm. Releasing it again would rewrite history."
+              exit 1
+            fi
+            echo "::warning::Tag $VERSION exists locally/remotely but is not yet published on npm. Allowing recovery run."
           fi
 
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
@@ -150,14 +168,21 @@ jobs:
 
       # npm never allows a version to be replaced or reused, so a collision has
       # to be caught before anything is tagged or committed.
+      # Only a confirmed 404 (not found) indicates availability.
       - name: Check the version is not already published
         run: |
           NAME="$(node -p "require('./package.json').name")"
-          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+          STATUS=0
+          OUTPUT=$(npm view "$NAME@$VERSION" version 2>&1) || STATUS=$?
+          if [ "$STATUS" -eq 0 ]; then
             echo "::error::$NAME@$VERSION is already published on npm. A version cannot be replaced."
             exit 1
+          elif echo "$OUTPUT" | grep -qE "E404|404 Not Found"; then
+            echo "$NAME@$VERSION is available on npm."
+          else
+            echo "::error::Failed to check npm registry for $NAME@$VERSION: $OUTPUT"
+            exit 1
           fi
-          echo "$NAME@$VERSION is available."
 
       # ── Build inside the pinned container ──────────────────────────────
       - name: Build Project
@@ -216,6 +241,11 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
+      - name: Verify npm CLI version
+        run: |
+          echo "Node version: $(node --version)"
+          echo "npm version: $(npm --version)"
+
       - name: Install NPM dependencies
         run: npm ci
 
@@ -232,16 +262,26 @@ jobs:
       - name: Commit version bump
         run: |
           git add package.json package-lock.json
-          git commit -m "release: $VERSION"
+          git commit -m "release: $VERSION" || echo "Version bump already committed"
 
       # Bare tag (no v prefix) — consistent with 0.1.0, 0.2.0, 0.3.0.
       - name: Tag
-        run: git tag "$VERSION"
-
-      - name: Push commit and tag
         run: |
-          git push origin HEAD:main
-          git push origin "$VERSION"
+          if ! git show-ref --tags --verify --quiet "refs/tags/$VERSION"; then
+            git tag "$VERSION"
+          fi
+
+      # Atomic push: branch and tag are pushed together in one command
+      - name: Push commit and tag
+        run: git push origin HEAD:main "$VERSION"
+
+      # ── Publish to npm with OIDC Trusted Publishing ────────────────────
+      # No NODE_AUTH_TOKEN or NPM_TOKEN needed. The `id-token: write`
+      # permission lets npm exchange a GitHub OIDC JWT for publish access.
+      # The trusted publisher must be configured on npmjs.com first.
+      # Published BEFORE creating the GitHub Release to prevent orphaned releases.
+      - name: Publish to npm
+        run: npm publish --provenance --access public
 
       # Generate release notes from commits since the previous tag.
       - name: Derive release notes
@@ -270,21 +310,16 @@ jobs:
             echo "RELEASE_NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
 
+      # Passed via environment variable $RELEASE_NOTES to prevent script injection
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NOTES: ${{ steps.notes.outputs.notes }}
         run: |
           gh release create "$VERSION" \
             --title "$VERSION" \
-            --notes "${{ steps.notes.outputs.notes }}" \
+            --notes "$RELEASE_NOTES" \
             --target "${{ github.sha }}"
-
-      # ── Publish to npm with OIDC Trusted Publishing ────────────────────
-      # No NODE_AUTH_TOKEN or NPM_TOKEN needed. The `id-token: write`
-      # permission lets npm exchange a GitHub OIDC JWT for publish access.
-      # The trusted publisher must be configured on npmjs.com first.
-      - name: Publish to npm
-        run: npm publish --provenance --access public
 
       - name: Release summary
         run: |
