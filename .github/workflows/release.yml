@@ -254,6 +254,10 @@ jobs:
           npm version "$VERSION" --no-git-tag-version
           echo "Bumped package.json to $VERSION"
 
+      # Recompile version.ts and dist/ with the bumped version
+      - name: Rebuild version artifacts
+        run: npm run build:version
+
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
@@ -261,7 +265,7 @@ jobs:
 
       - name: Commit version bump
         run: |
-          git add package.json package-lock.json
+          git add package.json package-lock.json dist/
           git commit -m "release: $VERSION" || echo "Version bump already committed"
 
       # Bare tag (no v prefix) — consistent with 0.1.0, 0.2.0, 0.3.0.
