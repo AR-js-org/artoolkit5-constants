@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -44,7 +44,12 @@ jobs:
           fi
 
           echo "Emscripten $ACTUAL matches .emscripten-version."
-          node --version
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
 
       - name: Install NPM dependencies
         run: npm ci
