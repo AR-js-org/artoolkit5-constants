@@ -26,8 +26,11 @@ Import only what you need. This allows bundlers (Webpack, Rollup, Vite) to remov
 ```typescript
 import {
     AR_PIXEL_FORMAT_RGBA,
-    AR_MATRIX_CODE_DETECTION
+    AR_MATRIX_CODE_DETECTION,
+    ARTOOLKIT_CONSTANTS_VERSION
 } from '@ar-js-org/artoolkit5-constants';
+
+console.log(`Loaded constants v${ARTOOLKIT_CONSTANTS_VERSION}`);
 
 // Example: Configuring ARController
 const config = {
@@ -44,9 +47,9 @@ if (config.pixelFormat === AR_PIXEL_FORMAT_RGBA) {
 If you prefer accessing constants via a global object (similar to how Enums work or legacy ARToolKit structure), use the `import * as` syntax:
 
 ```typescript
-import * as AR from '@ar-js-org//artoolkit5-constants';
+import * as AR from '@ar-js-org/artoolkit5-constants';
 
-// Now you can access everything under 'AR'
+console.log(`Version: ${AR.VERSION}`);
 console.log(AR.AR_LOG_LEVEL_ERROR); // Output: 3
 console.log(AR.AR_TEMPLATE_MATCHING_MONO); // Output: 1
 

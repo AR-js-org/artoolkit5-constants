@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Package version embedded in `dist/`.** Generated at build time from `package.json`
+  via `tools/gen_version.js` into `src/generated/version.ts` and exported from
+  `src/index.ts` as `VERSION` and `ARTOOLKIT_CONSTANTS_VERSION`. Bundled or vendored
+  copies can now inspect what version they were built from.
+- `npm run build:version` script to rebuild version artifacts and TypeScript definitions
+  without requiring Emscripten or Docker.
+
 ## [0.3.1] - 2026-09-18
 
 ### Fixed
@@ -109,7 +120,8 @@ change, since the disable flag is a build-time decision that may change.
 
 Initial release.
 
-[Unreleased]: https://github.com/AR-js-org/artoolkit5-constants/compare/0.3.0...HEAD
+[Unreleased]: https://github.com/AR-js-org/artoolkit5-constants/compare/0.3.1...HEAD
+[0.3.1]: https://github.com/AR-js-org/artoolkit5-constants/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/AR-js-org/artoolkit5-constants/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/AR-js-org/artoolkit5-constants/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/AR-js-org/artoolkit5-constants/tree/0.1.0

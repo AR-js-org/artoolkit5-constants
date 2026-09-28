@@ -4,7 +4,7 @@ Generates TypeScript constants from the ARToolKit5 (WebARKitLib) C headers, so
 that every project in the ecosystem reads the same integers from one place
 instead of hardcoding them.
 
-The package publishes **numbers only**. No engine code, no WebAssembly binary.
+The package publishes **numbers and the package version string**. No engine code, no WebAssembly binary.
 
 ## How it works
 
@@ -15,6 +15,11 @@ third_party/WebARKitLib/include/AR/*.h    C headers (submodule, LGPLv3)
       tools/gen_constants.js              loads it, reads the values
         src/generated/artoolkit_constants.ts
           dist/                           tsc output — published
+
+package.json                              version string
+  tools/gen_version.js                    reads it
+    src/generated/version.ts
+      dist/                               tsc output — published
 ```
 
 `gen_constants.js` **executes** the compiled module and reads properties off it.
