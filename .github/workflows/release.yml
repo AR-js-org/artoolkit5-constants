@@ -124,6 +124,19 @@ jobs:
         run: |
           VERSION="$INPUT_VERSION"
 
+          # `grep` matches line by line, so a multi-line input could pass the
+          # check below on one line and still write extra `version=` records to
+          # $GITHUB_OUTPUT. Reject any newline first, and do not echo the raw
+          # value: a newline in it could also inject workflow commands.
+          NL="$(printf '\n_')"
+          NL="${NL%_}"
+          case "$VERSION" in
+            *"$NL"*)
+              echo "::error::The version must be a single line."
+              exit 1
+              ;;
+          esac
+
           # Strict semver check (no v prefix allowed).
           # `grep -E`, not `[[ =~ ]]`: steps in a `container:` job run under
           # `sh` (dash), which has no `[[`. Keep this job POSIX.
