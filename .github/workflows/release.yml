@@ -1,0 +1,355 @@
+name: Release
+
+# Run manually from the Actions tab. This workflow performs the release:
+# it validates that the release PR (version bump, changelog, dist/) is merged
+# and in sync, tags that commit, publishes to npm with OIDC Trusted Publishing
+# (no NPM_TOKEN needed), and creates the GitHub Release. It creates no commit.
+#
+# It is one workflow rather than two on purpose. A Release created with the
+# default GITHUB_TOKEN does not trigger other workflows — GitHub blocks that to
+# prevent recursion — so a separate `on: release: published` publisher would
+# silently never fire.
+#
+# It is two *jobs* on purpose as well. Everything irreversible lives in
+# `release`, which carries a single `if: ${{ !inputs.dry_run }}` on the job
+# rather than repeated on every step. A step added there inherits the guard, so
+# the failure this structure exists to prevent — someone adds a publish target,
+# forgets the `if:`, and a run invoked with dry_run publishes anyway — is no
+# longer possible to write. npm never allows a version to be replaced, so that
+# mistake would have been unrecoverable.
+#
+# Authentication uses OIDC Trusted Publishing: GitHub Actions exchanges a
+# short-lived JWT with npm, so no NPM_TOKEN secret is stored or rotated.
+# Configure the trusted publisher on npmjs.com before first use.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, without a leading v (e.g. 1.1.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Run every check and show the result without tagging or publishing'
+        required: false
+        default: false
+        type: boolean
+
+# Two releases running at once would race over the tag and the branch push.
+# Never `cancel-in-progress` here: cancelling a run that has already published
+# leaves a version on npm with no tag and no Release behind it, and npm will not
+# let that version be replaced. Queueing is the only safe behaviour.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # ── prepare ────────────────────────────────────────────────────────────
+  # Everything that can fail safely. Nothing here leaves the runner: no
+  # commit, no tag, no Release, no package. A dry run ends when this job does.
+  prepare:
+    runs-on: ubuntu-latest
+
+    # The same image CI and `npm run build:docker` use locally. Keep this tag
+    # in step with .emscripten-version; the verification step fails loudly if
+    # they drift.
+    container: emscripten/emsdk:4.0.17
+
+    permissions:
+      contents: read
+
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Pinned to the dispatched commit rather than the branch tip so the
+          # release job tags and publishes exactly what was tested here, even if
+          # someone pushes to main while the run is in progress.
+          ref: ${{ github.sha }}
+          submodules: recursive
+          # Full history: release notes are derived from commits since the
+          # previous tag, and a shallow clone has neither the tags nor the log.
+          fetch-depth: 0
+
+      # The checkout is owned by a different user than this container runs as,
+      # which trips git's dubious-ownership guard.
+      - name: Trust the workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Verify the toolchain matches the pin
+        run: |
+          PINNED="$(cat .emscripten-version)"
+          ACTUAL="$(emcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+
+          if [ "$PINNED" != "$ACTUAL" ]; then
+            echo "::error::.emscripten-version says $PINNED but this container has emcc $ACTUAL."
+            echo "Update the 'container:' tag in this workflow and .emscripten-version together."
+            exit 1
+          fi
+
+          echo "Emscripten $ACTUAL matches .emscripten-version."
+
+      - name: Ensure releases run from main
+        if: ${{ !inputs.dry_run && github.ref_name != 'main' }}
+        run: |
+          echo "::error::Release workflow must be run from the main branch (current: ${GITHUB_REF_NAME})."
+          exit 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Verify npm CLI version
+        run: |
+          echo "Node version: $(node --version)"
+          echo "npm version: $(npm --version)"
+          NPM_MAJOR=$(npm --version | cut -d. -f1)
+          if [ "$NPM_MAJOR" -lt 11 ]; then
+            echo "::error::npm version 11 or higher is required for Trusted Publishing. Found: $(npm --version)"
+            exit 1
+          fi
+
+      - name: Validate the version
+        id: validate
+        # Read from the environment rather than interpolated into the script.
+        # `${{ }}` substitution happens before the shell parses anything, so a
+        # dispatch input spliced straight into `run:` is executed as code.
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="$INPUT_VERSION"
+
+          # Strict semver check (no v prefix allowed).
+          SEMVER='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+          if ! [[ "$VERSION" =~ $SEMVER ]]; then
+            echo "::error::'$INPUT_VERSION' is not a valid semver version. Give it without a leading v, e.g. 1.1.0."
+            exit 1
+          fi
+
+          # This repo uses bare tags (0.1.0, not v0.1.0).
+          # If the tag exists, check if it's already published on npm.
+          if git show-ref --tags --verify --quiet "refs/tags/$VERSION"; then
+            NAME="$(node -p "require('./package.json').name")"
+            STATUS=0
+            OUTPUT=$(npm view "$NAME@$VERSION" version 2>&1) || STATUS=$?
+            if [ "$STATUS" -eq 0 ]; then
+              echo "::error::Tag $VERSION already exists and $NAME@$VERSION is already published on npm. Releasing it again would rewrite history."
+              exit 1
+            fi
+
+            # A recovery run may only resume a tag that already names the commit
+            # being released. Otherwise the job would publish this commit while
+            # the tag, and the GitHub Release created from it, point elsewhere.
+            # `^{commit}` also resolves annotated tags to the commit they wrap.
+            TAG_SHA="$(git rev-parse "refs/tags/$VERSION^{commit}")"
+            HEAD_SHA="$(git rev-parse HEAD)"
+            if [ "$TAG_SHA" != "$HEAD_SHA" ]; then
+              echo "::error::Tag $VERSION points to $TAG_SHA, but this run would release $HEAD_SHA. Delete the stale tag, or dispatch from the commit it names."
+              exit 1
+            fi
+
+            echo "::warning::Tag $VERSION exists and points at this commit, but is not yet published on npm. Allowing recovery run."
+          fi
+
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # The release PR is where the version is decided: it bumps package.json,
+      # promotes [Unreleased] to a dated section in CHANGELOG.md and rebuilds
+      # dist/. This workflow publishes that commit as it is, so refuse to start
+      # if the PR was not merged or the input names a different version.
+      - name: Verify the release PR was merged
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$PKG" != "$VERSION" ]; then
+            echo "::error::package.json is at $PKG but the requested release is $VERSION. Merge the release PR (version bump, changelog, dist/) first."
+            exit 1
+          fi
+
+          if ! grep -qE "^## \[$(printf '%s' "$VERSION" | sed 's/\./\\./g')\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [$VERSION]' section. Promote [Unreleased] in the release PR."
+            exit 1
+          fi
+
+          # npm ci installs from the lockfile, and its two root version fields
+          # are what a bump most easily leaves behind.
+          LOCK_TOP="$(node -p "require('./package-lock.json').version")"
+          LOCK_ROOT="$(node -p "require('./package-lock.json').packages[''].version")"
+          if [ "$LOCK_TOP" != "$VERSION" ] || [ "$LOCK_ROOT" != "$VERSION" ]; then
+            echo "::error::package-lock.json is at $LOCK_TOP (root package: $LOCK_ROOT) but the requested release is $VERSION. Run 'npm install --package-lock-only' in the release PR."
+            exit 1
+          fi
+
+          echo "package.json, package-lock.json and CHANGELOG.md all name $VERSION."
+
+      # npm will not generate provenance for a package built in a private
+      # repository. Left unchecked that surfaces at the publish step, by which
+      # point the version commit, the tag and the GitHub Release have all been
+      # pushed — leaving a release with no package behind it and manual cleanup
+      # before it can be retried. Failing here costs nothing instead.
+      - name: Ensure the repository is public
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$(gh repo view "${{ github.repository }}" --json isPrivate --jq .isPrivate)" = "true" ]; then
+            echo "::error::${{ github.repository }} is private, and npm cannot generate provenance from a private repository. Make it public; provenance is no longer optional here, since trusted publishing attests it automatically."
+            exit 1
+          fi
+          echo "Repository is public; provenance can be generated."
+
+      - name: Install NPM dependencies
+        run: npm ci
+
+      # npm never allows a version to be replaced or reused, so a collision has
+      # to be caught before anything is tagged or committed.
+      # Only a confirmed 404 (not found) indicates availability.
+      - name: Check the version is not already published
+        run: |
+          NAME="$(node -p "require('./package.json').name")"
+          STATUS=0
+          OUTPUT=$(npm view "$NAME@$VERSION" version 2>&1) || STATUS=$?
+          if [ "$STATUS" -eq 0 ]; then
+            echo "::error::$NAME@$VERSION is already published on npm. A version cannot be replaced."
+            exit 1
+          elif echo "$OUTPUT" | grep -qE "E404|404 Not Found"; then
+            echo "$NAME@$VERSION is available on npm."
+          else
+            echo "::error::Failed to check npm registry for $NAME@$VERSION: $OUTPUT"
+            exit 1
+          fi
+
+      # ── Build inside the pinned container ──────────────────────────────
+      - name: Build Project
+        run: npm run build
+
+      # dist/ is committed in this repo. After rebuilding, verify the committed
+      # dist/ matches the fresh build. If they differ, the release is refused —
+      # someone forgot to commit the rebuilt dist/ or the build is not
+      # reproducible.
+      - name: Verify dist/ is in sync
+        run: |
+          if [ -n "$(git status --porcelain dist/)" ]; then
+            echo "::error::dist/ is out of sync with the source. Run 'npm run build:docker' locally, commit dist/, and push before releasing."
+            echo "Changed files:"
+            git status --porcelain dist/
+            git diff --stat dist/
+            exit 1
+          fi
+          echo "dist/ is in sync with the build output."
+
+      - name: Dry-run summary
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "## 🏜️ Dry Run Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "All checks passed for version **$VERSION**." >> "$GITHUB_STEP_SUMMARY"
+          echo "Re-run with \`dry_run = false\` to publish." >> "$GITHUB_STEP_SUMMARY"
+
+  # ── release ──────────────────────────────────────────────────────────
+  # Everything irreversible. Skipped entirely on dry runs.
+  release:
+    needs: prepare
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write     # push the version commit + tag, create Release
+      id-token: write     # OIDC token exchange with npm (Trusted Publishing)
+
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Verify npm CLI version
+        run: |
+          echo "Node version: $(node --version)"
+          echo "npm version: $(npm --version)"
+
+      # The release commit already exists: the release PR bumped package.json,
+      # promoted the changelog and rebuilt dist/, and `prepare` verified all of
+      # it. This job adds nothing to the repository except the tag.
+      #
+      # Bare tag (no v prefix) — consistent with 0.1.0, 0.2.0, 0.3.0.
+      - name: Tag
+        run: |
+          if ! git show-ref --tags --verify --quiet "refs/tags/$VERSION"; then
+            git tag "$VERSION"
+          fi
+
+      - name: Push tag
+        run: git push origin "refs/tags/$VERSION"
+
+      # ── Publish to npm with OIDC Trusted Publishing ────────────────────
+      # No NODE_AUTH_TOKEN or NPM_TOKEN needed. The `id-token: write`
+      # permission lets npm exchange a GitHub OIDC JWT for publish access.
+      # The trusted publisher must be configured on npmjs.com first.
+      # Published BEFORE creating the GitHub Release to prevent orphaned releases.
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+
+      # Generate release notes from commits since the previous tag.
+      - name: Derive release notes
+        id: notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 "$VERSION^" 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="$PREV_TAG..$VERSION"
+            COMPARE_URL="https://github.com/${{ github.repository }}/compare/$PREV_TAG...$VERSION"
+          else
+            RANGE="$VERSION"
+            COMPARE_URL=""
+          fi
+
+          NOTES=$(git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges 2>/dev/null || echo "- Initial release")
+
+          {
+            echo "notes<<RELEASE_NOTES_EOF"
+            echo "## What's Changed"
+            echo ""
+            echo "$NOTES"
+            if [ -n "$COMPARE_URL" ]; then
+              echo ""
+              echo "**Full Changelog**: $COMPARE_URL"
+            fi
+            echo "RELEASE_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # Passed via environment variable $RELEASE_NOTES to prevent script injection
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NOTES: ${{ steps.notes.outputs.notes }}
+        run: |
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --notes "$RELEASE_NOTES" \
+            --target "${{ github.sha }}"
+
+      - name: Release summary
+        run: |
+          echo "## 🚀 Released $VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **npm**: https://www.npmjs.com/package/@ar-js-org/artoolkit5-constants/v/$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **GitHub Release**: https://github.com/${{ github.repository }}/releases/tag/$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Provenance**: automatically attested via OIDC" >> "$GITHUB_STEP_SUMMARY"

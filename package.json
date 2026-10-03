@@ -1,6 +1,6 @@
 {
   "name": "@ar-js-org/artoolkit5-constants",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Generator for ARToolKit5 constants via Embind extraction",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -46,10 +46,16 @@
     "build:ts": "tsc",
     "build:extractor": "cmake --build build --target constants_extractor",
     "clean": "rimraf ./build ./dist",
-    "generate": "node ./tools/gen_constants.js ./build/constants_extractor.js ./src/generated/artoolkit_constants.ts",
+    "generate:constants": "node ./tools/gen_constants.js ./build/constants_extractor.js ./src/generated/artoolkit_constants.ts",
+    "generate:version": "node ./tools/gen_version.js",
+    "generate": "npm run generate:constants && npm run generate:version",
     "build": "npm run configure && npm run build:extractor && npm run generate && npm run build:ts",
-    "build:docker": "node ./tools/docker-build.js",
-    "prepublishOnly": "npm run build"
+    "build:version": "npm run generate:version && tsc -p tsconfig.version.json",
+    "build:docker": "node ./tools/docker-build.js"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "devDependencies": {
     "rimraf": "^6.1.3",
