@@ -176,7 +176,16 @@ jobs:
             exit 1
           fi
 
-          echo "package.json and CHANGELOG.md both name $VERSION."
+          # npm ci installs from the lockfile, and its two root version fields
+          # are what a bump most easily leaves behind.
+          LOCK_TOP="$(node -p "require('./package-lock.json').version")"
+          LOCK_ROOT="$(node -p "require('./package-lock.json').packages[''].version")"
+          if [ "$LOCK_TOP" != "$VERSION" ] || [ "$LOCK_ROOT" != "$VERSION" ]; then
+            echo "::error::package-lock.json is at $LOCK_TOP (root package: $LOCK_ROOT) but the requested release is $VERSION. Run 'npm install --package-lock-only' in the release PR."
+            exit 1
+          fi
+
+          echo "package.json, package-lock.json and CHANGELOG.md all name $VERSION."
 
       # npm will not generate provenance for a package built in a private
       # repository. Left unchecked that surfaces at the publish step, by which

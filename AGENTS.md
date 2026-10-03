@@ -136,7 +136,7 @@ exists only once its release PR does.
 2. **Merge it**, then run the **Release** workflow from `main`
    (Actions → Release → Run workflow) with `version` = `X.Y.Z`. Run it once with
    `dry_run` first: it performs every check and publishes nothing.
-3. The workflow refuses to start unless `package.json` and `CHANGELOG.md` both
+3. The workflow refuses to start unless `package.json`, `package-lock.json` and `CHANGELOG.md` all
    name `X.Y.Z`, the tag is free, the version is unpublished, and `dist/`
    matches a fresh build in the pinned container. It then tags the merged
    commit, publishes to npm with provenance, and creates the GitHub Release. It
