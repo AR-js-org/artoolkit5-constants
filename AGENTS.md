@@ -137,10 +137,14 @@ exists only once its release PR does.
    (Actions → Release → Run workflow) with `version` = `X.Y.Z`. Run it once with
    `dry_run` first: it performs every check and publishes nothing.
 3. The workflow refuses to start unless `package.json`, `package-lock.json` and `CHANGELOG.md` all
-   name `X.Y.Z`, the tag is free, the version is unpublished, and `dist/`
-   matches a fresh build in the pinned container. It then tags the merged
-   commit, publishes to npm with provenance, and creates the GitHub Release. It
-   pushes **no commit** — only the tag.
+   name `X.Y.Z`, the version is stable semver (no pre-release suffix), no tag
+   names a different commit, the version is unpublished, and `dist/` matches a
+   fresh build in the pinned container. These checks also run on `dry_run`,
+   including the `main`-branch and public-repository ones. It then tags the
+   merged commit, publishes to npm with provenance, and creates the GitHub
+   Release. It pushes **no commit** — only the tag.
+   If a run dies after `npm publish` but before the Release exists, rerun it
+   with the same version: it skips publishing and creates the Release.
 
 Publishing uses OIDC Trusted Publishing; there is no `NPM_TOKEN`. The trusted
 publisher must be configured on npmjs.com for this repository and `release.yml`.

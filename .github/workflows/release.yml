@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release, without a leading v (e.g. 1.1.0)'
+        description: 'Stable version to release, without a leading v (e.g. 1.1.0)'
         required: true
         type: string
       dry_run:
@@ -59,6 +59,7 @@ jobs:
 
     outputs:
       version: ${{ steps.validate.outputs.version }}
+      published: ${{ steps.npm_state.outputs.published }}
 
     steps:
       - name: Checkout
@@ -91,8 +92,10 @@ jobs:
 
           echo "Emscripten $ACTUAL matches .emscripten-version."
 
+      # Also enforced on dry runs: a dry run that skips a check the real run
+      # makes reports success for a release that would then be refused.
       - name: Ensure releases run from main
-        if: ${{ !inputs.dry_run && github.ref_name != 'main' }}
+        if: ${{ github.ref_name != 'main' }}
         run: |
           echo "::error::Release workflow must be run from the main branch (current: ${GITHUB_REF_NAME})."
           exit 1
@@ -124,39 +127,49 @@ jobs:
         run: |
           VERSION="$INPUT_VERSION"
 
-          # Strict semver check (no v prefix allowed).
-          SEMVER='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
-          if ! [[ "$VERSION" =~ $SEMVER ]]; then
-            echo "::error::'$INPUT_VERSION' is not a valid semver version. Give it without a leading v, e.g. 1.1.0."
+          # `grep` matches line by line, so a multi-line input could pass the
+          # check below on one line and still write extra `version=` records to
+          # $GITHUB_OUTPUT. Reject any newline first, and do not echo the raw
+          # value: a newline in it could also inject workflow commands.
+          NL="$(printf '\n_')"
+          NL="${NL%_}"
+          case "$VERSION" in
+            *"$NL"*)
+              echo "::error::The version must be a single line."
+              exit 1
+              ;;
+          esac
+
+          # Strict semver, stable releases only (no v prefix, no leading zeros,
+          # no pre-release suffix). A pre-release would need `npm publish --tag`
+          # and `gh release create --prerelease`; without them it would become
+          # `latest`, so it is refused rather than half-supported.
+          # `grep -E`, not `[[ =~ ]]`: steps in a `container:` job run under
+          # `sh` (dash), which has no `[[`. Keep this job POSIX.
+          SEMVER='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          if ! printf '%s\n' "$VERSION" | grep -Eq "$SEMVER"; then
+            echo "::error::'$INPUT_VERSION' is not a valid stable semver version. Give it without a leading v or pre-release suffix, e.g. 1.1.0."
             exit 1
           fi
 
           # This repo uses bare tags (0.1.0, not v0.1.0).
-          # If the tag exists, check if it's already published on npm.
+          # An existing tag may only be resumed if it already names the commit
+          # being released. Otherwise the job would publish this commit while
+          # the tag, and the GitHub Release created from it, point elsewhere.
+          # `^{commit}` also resolves annotated tags to the commit they wrap.
+          TAG_EXISTS=false
           if git show-ref --tags --verify --quiet "refs/tags/$VERSION"; then
-            NAME="$(node -p "require('./package.json').name")"
-            STATUS=0
-            OUTPUT=$(npm view "$NAME@$VERSION" version 2>&1) || STATUS=$?
-            if [ "$STATUS" -eq 0 ]; then
-              echo "::error::Tag $VERSION already exists and $NAME@$VERSION is already published on npm. Releasing it again would rewrite history."
-              exit 1
-            fi
-
-            # A recovery run may only resume a tag that already names the commit
-            # being released. Otherwise the job would publish this commit while
-            # the tag, and the GitHub Release created from it, point elsewhere.
-            # `^{commit}` also resolves annotated tags to the commit they wrap.
             TAG_SHA="$(git rev-parse "refs/tags/$VERSION^{commit}")"
             HEAD_SHA="$(git rev-parse HEAD)"
             if [ "$TAG_SHA" != "$HEAD_SHA" ]; then
               echo "::error::Tag $VERSION points to $TAG_SHA, but this run would release $HEAD_SHA. Delete the stale tag, or dispatch from the commit it names."
               exit 1
             fi
-
-            echo "::warning::Tag $VERSION exists and points at this commit, but is not yet published on npm. Allowing recovery run."
+            TAG_EXISTS=true
           fi
 
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TAG_EXISTS=$TAG_EXISTS" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       # The release PR is where the version is decided: it bumps package.json,
@@ -189,40 +202,101 @@ jobs:
 
       # npm will not generate provenance for a package built in a private
       # repository. Left unchecked that surfaces at the publish step, by which
-      # point the version commit, the tag and the GitHub Release have all been
-      # pushed — leaving a release with no package behind it and manual cleanup
-      # before it can be retried. Failing here costs nothing instead.
+      # point the tag has already been pushed — leaving a tag with no package
+      # behind it and manual cleanup before it can be retried. Failing here
+      # costs nothing instead.
+      #
+      # Uses node and the REST API rather than `gh`, which this container does
+      # not ship. Anything other than an explicit `private: false` fails: a
+      # failed query must not read as "public".
       - name: Ensure the repository is public
-        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "$(gh repo view "${{ github.repository }}" --json isPrivate --jq .isPrivate)" = "true" ]; then
-            echo "::error::${{ github.repository }} is private, and npm cannot generate provenance from a private repository. Make it public; provenance is no longer optional here, since trusted publishing attests it automatically."
-            exit 1
-          fi
-          echo "Repository is public; provenance can be generated."
+          node - <<'EOF'
+          const repo = process.env.GITHUB_REPOSITORY;
+          const headers = { Accept: 'application/vnd.github+json' };
+          if (process.env.GH_TOKEN) headers.Authorization = `Bearer ${process.env.GH_TOKEN}`;
+
+          fetch(`https://api.github.com/repos/${repo}`, { headers })
+            .then((res) => {
+              if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);
+              return res.json();
+            })
+            .then((body) => {
+              if (body.private !== false) {
+                console.error(`::error::${repo} is not reported as public, and npm cannot generate provenance from a private repository. Make it public; trusted publishing attests provenance automatically.`);
+                process.exit(1);
+              }
+              console.log('Repository is public; provenance can be generated.');
+            })
+            .catch((err) => {
+              console.error(`::error::Could not determine whether ${repo} is public: ${err.message}`);
+              process.exit(1);
+            });
+          EOF
 
       - name: Install NPM dependencies
         run: npm ci
 
       # npm never allows a version to be replaced or reused, so a collision has
-      # to be caught before anything is tagged or committed.
+      # to be caught before anything is tagged.
       # Only a confirmed 404 (not found) indicates availability.
+      #
+      # The one exception is resuming a release that died after `npm publish`
+      # but before the GitHub Release existed. That is allowed only when the tag
+      # already names this commit (checked in `Validate the version`) and no
+      # Release exists yet; the release job then skips publishing and finishes
+      # the Release. A complete release is still refused.
       - name: Check the version is not already published
+        id: npm_state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           NAME="$(node -p "require('./package.json').name")"
           STATUS=0
           OUTPUT=$(npm view "$NAME@$VERSION" version 2>&1) || STATUS=$?
-          if [ "$STATUS" -eq 0 ]; then
-            echo "::error::$NAME@$VERSION is already published on npm. A version cannot be replaced."
-            exit 1
-          elif echo "$OUTPUT" | grep -qE "E404|404 Not Found"; then
-            echo "$NAME@$VERSION is available on npm."
-          else
+
+          if [ "$STATUS" -ne 0 ]; then
+            if echo "$OUTPUT" | grep -qE "E404|404 Not Found"; then
+              echo "$NAME@$VERSION is available on npm."
+              echo "published=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             echo "::error::Failed to check npm registry for $NAME@$VERSION: $OUTPUT"
             exit 1
           fi
+
+          if [ "$TAG_EXISTS" != "true" ]; then
+            echo "::error::$NAME@$VERSION is already published on npm and no tag names this commit. A version cannot be replaced."
+            exit 1
+          fi
+
+          RELEASE="$(node - <<'EOF'
+          const url = `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/releases/tags/${process.env.VERSION}`;
+          const headers = { Accept: 'application/vnd.github+json' };
+          if (process.env.GH_TOKEN) headers.Authorization = `Bearer ${process.env.GH_TOKEN}`;
+
+          fetch(url, { headers })
+            .then((res) => {
+              if (res.status === 404) return console.log('missing');
+              if (res.ok) return console.log('exists');
+              throw new Error(`GitHub API returned ${res.status}`);
+            })
+            .catch((err) => {
+              console.error(err.message);
+              process.exit(1);
+            });
+          EOF
+          )" || { echo "::error::Could not check for an existing GitHub Release."; exit 1; }
+
+          if [ "$RELEASE" != "missing" ]; then
+            echo "::error::$NAME@$VERSION is already published and its GitHub Release exists. Nothing left to release."
+            exit 1
+          fi
+
+          echo "::warning::$NAME@$VERSION is on npm and tag $VERSION names this commit, but no GitHub Release exists. Recovery run: the release job will skip publishing and create the Release."
+          echo "published=true" >> "$GITHUB_OUTPUT"
 
       # ── Build inside the pinned container ──────────────────────────────
       - name: Build Project
@@ -259,7 +333,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write     # push the version commit + tag, create Release
+      contents: write     # push the tag, create Release
       id-token: write     # OIDC token exchange with npm (Trusted Publishing)
 
     env:
@@ -305,7 +379,10 @@ jobs:
       # permission lets npm exchange a GitHub OIDC JWT for publish access.
       # The trusted publisher must be configured on npmjs.com first.
       # Published BEFORE creating the GitHub Release to prevent orphaned releases.
+      # Skipped when `prepare` found this exact version already on npm with a
+      # matching tag and no Release: the only thing left to do is the Release.
       - name: Publish to npm
+        if: ${{ needs.prepare.outputs.published != 'true' }}
         run: npm publish --provenance --access public
 
       # Generate release notes from commits since the previous tag.
