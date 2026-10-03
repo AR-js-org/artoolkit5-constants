@@ -141,7 +141,19 @@ jobs:
               echo "::error::Tag $VERSION already exists and $NAME@$VERSION is already published on npm. Releasing it again would rewrite history."
               exit 1
             fi
-            echo "::warning::Tag $VERSION exists locally/remotely but is not yet published on npm. Allowing recovery run."
+
+            # A recovery run may only resume a tag that already names the commit
+            # being released. Otherwise the job would publish this commit while
+            # the tag, and the GitHub Release created from it, point elsewhere.
+            # `^{commit}` also resolves annotated tags to the commit they wrap.
+            TAG_SHA="$(git rev-parse "refs/tags/$VERSION^{commit}")"
+            HEAD_SHA="$(git rev-parse HEAD)"
+            if [ "$TAG_SHA" != "$HEAD_SHA" ]; then
+              echo "::error::Tag $VERSION points to $TAG_SHA, but this run would release $HEAD_SHA. Delete the stale tag, or dispatch from the commit it names."
+              exit 1
+            fi
+
+            echo "::warning::Tag $VERSION exists and points at this commit, but is not yet published on npm. Allowing recovery run."
           fi
 
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
