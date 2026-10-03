@@ -1,9 +1,9 @@
 name: Release
 
 # Run manually from the Actions tab. This workflow performs the release:
-# it validates the version and dist/ sync, bumps package.json, tags, publishes
-# to npm with OIDC Trusted Publishing (no NPM_TOKEN needed), and creates the
-# GitHub Release.
+# it validates that the release PR (version bump, changelog, dist/) is merged
+# and in sync, tags that commit, publishes to npm with OIDC Trusted Publishing
+# (no NPM_TOKEN needed), and creates the GitHub Release. It creates no commit.
 #
 # It is one workflow rather than two on purpose. A Release created with the
 # default GITHUB_TOKEN does not trigger other workflows — GitHub blocks that to
@@ -141,11 +141,51 @@ jobs:
               echo "::error::Tag $VERSION already exists and $NAME@$VERSION is already published on npm. Releasing it again would rewrite history."
               exit 1
             fi
-            echo "::warning::Tag $VERSION exists locally/remotely but is not yet published on npm. Allowing recovery run."
+
+            # A recovery run may only resume a tag that already names the commit
+            # being released. Otherwise the job would publish this commit while
+            # the tag, and the GitHub Release created from it, point elsewhere.
+            # `^{commit}` also resolves annotated tags to the commit they wrap.
+            TAG_SHA="$(git rev-parse "refs/tags/$VERSION^{commit}")"
+            HEAD_SHA="$(git rev-parse HEAD)"
+            if [ "$TAG_SHA" != "$HEAD_SHA" ]; then
+              echo "::error::Tag $VERSION points to $TAG_SHA, but this run would release $HEAD_SHA. Delete the stale tag, or dispatch from the commit it names."
+              exit 1
+            fi
+
+            echo "::warning::Tag $VERSION exists and points at this commit, but is not yet published on npm. Allowing recovery run."
           fi
 
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # The release PR is where the version is decided: it bumps package.json,
+      # promotes [Unreleased] to a dated section in CHANGELOG.md and rebuilds
+      # dist/. This workflow publishes that commit as it is, so refuse to start
+      # if the PR was not merged or the input names a different version.
+      - name: Verify the release PR was merged
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$PKG" != "$VERSION" ]; then
+            echo "::error::package.json is at $PKG but the requested release is $VERSION. Merge the release PR (version bump, changelog, dist/) first."
+            exit 1
+          fi
+
+          if ! grep -qE "^## \[$(printf '%s' "$VERSION" | sed 's/\./\\./g')\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [$VERSION]' section. Promote [Unreleased] in the release PR."
+            exit 1
+          fi
+
+          # npm ci installs from the lockfile, and its two root version fields
+          # are what a bump most easily leaves behind.
+          LOCK_TOP="$(node -p "require('./package-lock.json').version")"
+          LOCK_ROOT="$(node -p "require('./package-lock.json').packages[''].version")"
+          if [ "$LOCK_TOP" != "$VERSION" ] || [ "$LOCK_ROOT" != "$VERSION" ]; then
+            echo "::error::package-lock.json is at $LOCK_TOP (root package: $LOCK_ROOT) but the requested release is $VERSION. Run 'npm install --package-lock-only' in the release PR."
+            exit 1
+          fi
+
+          echo "package.json, package-lock.json and CHANGELOG.md all name $VERSION."
 
       # npm will not generate provenance for a package built in a private
       # repository. Left unchecked that surfaces at the publish step, by which
@@ -246,28 +286,10 @@ jobs:
           echo "Node version: $(node --version)"
           echo "npm version: $(npm --version)"
 
-      - name: Install NPM dependencies
-        run: npm ci
-
-      - name: Bump version in package.json
-        run: |
-          npm version "$VERSION" --no-git-tag-version
-          echo "Bumped package.json to $VERSION"
-
-      # Recompile version.ts and dist/ with the bumped version
-      - name: Rebuild version artifacts
-        run: npm run build:version
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Commit version bump
-        run: |
-          git add package.json package-lock.json dist/
-          git commit -m "release: $VERSION" || echo "Version bump already committed"
-
+      # The release commit already exists: the release PR bumped package.json,
+      # promoted the changelog and rebuilt dist/, and `prepare` verified all of
+      # it. This job adds nothing to the repository except the tag.
+      #
       # Bare tag (no v prefix) — consistent with 0.1.0, 0.2.0, 0.3.0.
       - name: Tag
         run: |
@@ -275,9 +297,8 @@ jobs:
             git tag "$VERSION"
           fi
 
-      # Atomic push: branch and tag are pushed together in one command
-      - name: Push commit and tag
-        run: git push origin HEAD:main "$VERSION"
+      - name: Push tag
+        run: git push origin "refs/tags/$VERSION"
 
       # ── Publish to npm with OIDC Trusted Publishing ────────────────────
       # No NODE_AUTH_TOKEN or NPM_TOKEN needed. The `id-token: write`
