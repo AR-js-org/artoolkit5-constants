@@ -120,6 +120,49 @@ actually touches LGPLv3 code.
   `docs:`, `ci:`, `chore:`, `refactor:`, `test:`. `!` before the colon for
   breaking changes.
 
+## Releasing
+
+Changes accumulate under `## [Unreleased]` in `CHANGELOG.md`. A version section
+exists only once its release PR does.
+
+1. **Release PR** (`dev` → `main`), commit message `chore(release): X.Y.Z`. It
+   contains, and nothing else:
+   - `package.json` and `package-lock.json` bumped to `X.Y.Z`
+   - `CHANGELOG.md`: `[Unreleased]` promoted to `## [X.Y.Z] - YYYY-MM-DD`, a fresh
+     empty `[Unreleased]` above it, and the compare links updated. Tags are
+     **bare** (`0.3.1`, not `v0.3.1`) — a `v` prefix produces 404 links.
+   - `dist/` rebuilt with `npm run build:docker` (the embedded version changes
+     with every release, so `dist/generated/version.*` is always in the diff)
+2. **Merge it**, then run the **Release** workflow from `main`
+   (Actions → Release → Run workflow) with `version` = `X.Y.Z`. Run it once with
+   `dry_run` first: it performs every check and publishes nothing.
+3. The workflow refuses to start unless `package.json` and `CHANGELOG.md` both
+   name `X.Y.Z`, the tag is free, the version is unpublished, and `dist/`
+   matches a fresh build in the pinned container. It then tags the merged
+   commit, publishes to npm with provenance, and creates the GitHub Release. It
+   pushes **no commit** — only the tag.
+
+Publishing uses OIDC Trusted Publishing; there is no `NPM_TOKEN`. The trusted
+publisher must be configured on npmjs.com for this repository and `release.yml`.
+
+### Publishing by hand
+
+If the workflow is unavailable, publish from a clean checkout of a commit on
+`main` that passed CI:
+
+```bash
+npm publish --ignore-scripts --provenance=false
+```
+
+`publishConfig` sets `provenance: true`, which npm rejects outside a supported CI
+provider, so a manual publish has to turn it off explicitly.
+
+`--ignore-scripts` is safe **only because** `dist/` is committed and CI enforces
+that it matches a build in the pinned toolchain. Do not use it from a branch, an
+unmerged commit, or a tree with local changes — nothing has verified `dist/`
+there. Tag and create the GitHub Release yourself afterwards. A manual publish
+carries no provenance attestation.
+
 ## Licensing
 
 The package is MIT. The constants are extracted from WebARKitLib headers, which

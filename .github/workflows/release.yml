@@ -1,9 +1,9 @@
 name: Release
 
 # Run manually from the Actions tab. This workflow performs the release:
-# it validates the version and dist/ sync, bumps package.json, tags, publishes
-# to npm with OIDC Trusted Publishing (no NPM_TOKEN needed), and creates the
-# GitHub Release.
+# it validates that the release PR (version bump, changelog, dist/) is merged
+# and in sync, tags that commit, publishes to npm with OIDC Trusted Publishing
+# (no NPM_TOKEN needed), and creates the GitHub Release. It creates no commit.
 #
 # It is one workflow rather than two on purpose. A Release created with the
 # default GITHUB_TOKEN does not trigger other workflows — GitHub blocks that to
@@ -147,6 +147,25 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      # The release PR is where the version is decided: it bumps package.json,
+      # promotes [Unreleased] to a dated section in CHANGELOG.md and rebuilds
+      # dist/. This workflow publishes that commit as it is, so refuse to start
+      # if the PR was not merged or the input names a different version.
+      - name: Verify the release PR was merged
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$PKG" != "$VERSION" ]; then
+            echo "::error::package.json is at $PKG but the requested release is $VERSION. Merge the release PR (version bump, changelog, dist/) first."
+            exit 1
+          fi
+
+          if ! grep -qE "^## \[$(printf '%s' "$VERSION" | sed 's/\./\\./g')\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [$VERSION]' section. Promote [Unreleased] in the release PR."
+            exit 1
+          fi
+
+          echo "package.json and CHANGELOG.md both name $VERSION."
+
       # npm will not generate provenance for a package built in a private
       # repository. Left unchecked that surfaces at the publish step, by which
       # point the version commit, the tag and the GitHub Release have all been
@@ -246,28 +265,10 @@ jobs:
           echo "Node version: $(node --version)"
           echo "npm version: $(npm --version)"
 
-      - name: Install NPM dependencies
-        run: npm ci
-
-      - name: Bump version in package.json
-        run: |
-          npm version "$VERSION" --no-git-tag-version
-          echo "Bumped package.json to $VERSION"
-
-      # Recompile version.ts and dist/ with the bumped version
-      - name: Rebuild version artifacts
-        run: npm run build:version
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Commit version bump
-        run: |
-          git add package.json package-lock.json dist/
-          git commit -m "release: $VERSION" || echo "Version bump already committed"
-
+      # The release commit already exists: the release PR bumped package.json,
+      # promoted the changelog and rebuilt dist/, and `prepare` verified all of
+      # it. This job adds nothing to the repository except the tag.
+      #
       # Bare tag (no v prefix) — consistent with 0.1.0, 0.2.0, 0.3.0.
       - name: Tag
         run: |
@@ -275,9 +276,8 @@ jobs:
             git tag "$VERSION"
           fi
 
-      # Atomic push: branch and tag are pushed together in one command
-      - name: Push commit and tag
-        run: git push origin HEAD:main "$VERSION"
+      - name: Push tag
+        run: git push origin "refs/tags/$VERSION"
 
       # ── Publish to npm with OIDC Trusted Publishing ────────────────────
       # No NODE_AUTH_TOKEN or NPM_TOKEN needed. The `id-token: write`
