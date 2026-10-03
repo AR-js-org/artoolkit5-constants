@@ -125,8 +125,10 @@ jobs:
           VERSION="$INPUT_VERSION"
 
           # Strict semver check (no v prefix allowed).
+          # `grep -E`, not `[[ =~ ]]`: steps in a `container:` job run under
+          # `sh` (dash), which has no `[[`. Keep this job POSIX.
           SEMVER='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
-          if ! [[ "$VERSION" =~ $SEMVER ]]; then
+          if ! printf '%s\n' "$VERSION" | grep -Eq "$SEMVER"; then
             echo "::error::'$INPUT_VERSION' is not a valid semver version. Give it without a leading v, e.g. 1.1.0."
             exit 1
           fi
